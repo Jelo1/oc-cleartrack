@@ -1,5 +1,9 @@
 /* =====================================================================
-   
+   data.firebase.js  -  ClearTrack data layer (FIREBASE, free Spark plan)
+
+   Same functions as the demo data.js, so the pages did not have to change.
+   Uses Firebase Authentication (Email/Password) + Cloud Firestore.
+
    Firestore layout
      config/app                          { deadline: '2026-11-30' }
      users/{uid}                         { email, name, course, year, role, studentId?, section?, office? }
@@ -19,7 +23,7 @@ const DOMAIN = '@olivarezcollege.edu.ph';
 const OFFICES = [
   { id: 'library',    name: 'Library',                         short: 'Library',    location: 'DPRO Building, 3rd Floor',   hours: 'Mon–Fri, 8:00 AM–5:00 PM' },
   { id: 'accounting', name: 'Accounting',                      short: 'Accounting', location: 'ELO Building, 2nd Floor',    hours: 'Mon–Fri, 8:00 AM–5:00 PM' },
-  { id: 'osa',        name: 'Office of Student Affairs (OSA)', short: 'OSA',        location: 'Nursing Building, Ground Floor', hours: 'Mon–Fri, 8:00 AM–5:00 PM' },
+  { id: 'osa',        name: 'Office of Student Affairs (OSA)', short: 'OSA',        location: 'Student Center, Ground Floor', hours: 'Mon–Fri, 8:00 AM–5:00 PM' },
   { id: 'registrar',  name: 'Registrar Office',                short: 'Registrar',  location: 'ELO Building, 2nd Floor',  hours: 'Mon–Fri, 8:00 AM–5:00 PM' },
   { id: 'it',         name: 'IT Department',                   short: 'IT Department', location: 'DPRO Building, 3rd Floor', hours: 'Mon–Fri, 8:00 AM–5:00 PM' },
   { id: 'dean',       name: 'Dean assigned office',            short: 'Dean',       location: 'ELO Building, 3rd Floor',  hours: 'Mon–Fri, 8:00 AM–5:00 PM' }
@@ -41,8 +45,12 @@ const DB = (() => {
     firebase.initializeApp(FIREBASE_CONFIG);
     auth = firebase.auth();
     fs = firebase.firestore();
-    /*  Long polling uses plain requests and works everywhere. */
+    /* Some networks, VPNs and ad blockers block Firestore's streaming connection
+       ("unavailable" errors). Long polling uses plain requests and works everywhere. */
     fs.settings({ experimentalForceLongPolling: true });
+    /* Some networks, VPNs, proxies and browser shields break Firestore's live
+       connection (error "unavailable"). This lets it fall back to plain HTTP. */
+    fs.settings({ experimentalAutoDetectLongPolling: true, merge: true });
     /* The first auth event tells us whether someone is already signed in. */
     authReady = new Promise(res => { const off = auth.onAuthStateChanged(u => { off(); res(u); }); });
   } else {
@@ -60,7 +68,9 @@ const DB = (() => {
       case 'auth/too-many-requests':    return 'Too many attempts. Please wait a few minutes, or reset your PIN.';
       case 'auth/network-request-failed': return 'No internet connection. Please check your network and try again.';
       case 'auth/email-already-in-use': return 'This email already has an account. Please sign in.';
-      case 'auth/operation-not-allowed': return 'Email/Password sign-in is not enabled in Firebase yet.';
+      case 'auth/operation-not-allowed': return 'This sign-in method is not enabled in Firebase yet (Authentication → Sign-in method).';
+      case 'auth/unauthorized-continue-uri':
+      case 'auth/invalid-continue-uri': return 'This website address is not allowed in Firebase yet (Authentication → Settings → Authorized domains).';
       case 'auth/expired-action-code':
       case 'auth/invalid-action-code':  return 'This reset link is invalid or has expired. Please request a new one.';
       case 'auth/requires-recent-login': return 'Please sign in again, then try once more.';
@@ -156,15 +166,43 @@ const DB = (() => {
     catch (e) { return fail(authMsg(e)); }
   }
 
-  /* ---------- forgot PIN (Firebase emails a reset LINK, not a 6-digit code) ---------- */
+  /* ---------- forgot PIN ----------
+     Firebase emails a link that opens OUR reset-pin.html page ("email link" sign-in).
+     On that page the student confirms their email and chooses a new 4-digit PIN. */
+  const RESET_KEY = 'cleartrack.resetEmail';
   async function sendResetLink(email) {
     if (!configured) return fail(NOT_SET);
-    try { await auth.sendPasswordResetEmail(email.toLowerCase()); return { ok: true }; }
-    catch (e) {
-      if (e.code === 'auth/user-not-found') return { ok: true };   // do not reveal which emails exist
+    email = email.toLowerCase();
+    try {
+      await auth.sendSignInLinkToEmail(email, { url: new URL('reset-pin.html', location.href).href, handleCodeInApp: true });
+      try { localStorage.setItem(RESET_KEY, email); } catch (e) { /* ignore */ }
+      return { ok: true };
+    } catch (e) { return fail(authMsg(e)); }
+  }
+  function isResetLink(href) { return configured && auth.isSignInWithEmailLink(href); }
+  function rememberedResetEmail() { try { return localStorage.getItem(RESET_KEY) || ''; } catch (e) { return ''; } }
+  async function resetWithEmailLink(email, href, pin) {
+    if (!configured) return fail(NOT_SET);
+    email = email.toLowerCase();
+    let cred;
+    try { cred = await auth.signInWithEmailLink(email, href); }
+    catch (e) { return fail(e.code === 'auth/invalid-email' ? 'That email does not match this link. Type the email you asked the link for.' : authMsg(e)); }
+    try {
+      if (!(await profileOf(cred.user.uid))) {   // no ClearTrack account: do not keep the login Firebase just made
+        try { await cred.user.delete(); } catch (e2) { await auth.signOut(); }
+        return fail('No ClearTrack account was found for this email.');
+      }
+      await cred.user.updatePassword(pw(pin));
+      await auth.signOut();
+      try { localStorage.removeItem(RESET_KEY); } catch (e) { /* ignore */ }
+      return { ok: true };
+    } catch (e) {
+      console.error(e);
+      try { await auth.signOut(); } catch (e2) { /* ignore */ }
       return fail(authMsg(e));
     }
   }
+  /* Kept for Firebase's own reset-password links (used if an action URL is ever set). */
   async function verifyResetLink(oobCode) {
     if (!configured) return fail(NOT_SET);
     try { return { ok: true, email: await auth.verifyPasswordResetCode(oobCode) }; }
@@ -236,8 +274,10 @@ const DB = (() => {
   }
 
   /* ---------- deadline reminder (runs when a student opens Home) ----------
-     the reminder is created the moment the student opens the app within 1 day of an office deadline and
-     still has that office to clear.  */
+     Firebase's free plan cannot run scheduled jobs, so the reminder is created
+     the moment the student opens the app within 1 day of an office deadline and
+     still has that office to clear. A fixed document id (one per date) stops
+     duplicates. */
   async function ensureDeadlineReminder(user, rows) {
     try {
       if (!configured || !user || user.role !== 'student') return;
@@ -263,7 +303,8 @@ const DB = (() => {
   }
 
   /* ---------- staff ---------- */
-  /* staff search by the exact school email or the exact student ID number. */
+  /* Firestore cannot do "contains" searches, so staff search by the exact
+     school email or the exact student ID number. */
   async function searchStudent(q) {
     q = String(q || '').trim(); if (!q) return null;
     const col = fs.collection('users');
@@ -284,7 +325,7 @@ const DB = (() => {
     pending:     { title: `${off.short} is reviewing`,          text: note || 'Your clearance is currently being reviewed.' }
   }[status]);
 
-  /* Staff set the deadline for THEIR office only. */
+  /* Staff set the deadline for THEIR office only (the rules enforce this too). */
   async function setOfficeDeadline(officeId, date, staff) {
     if (!staff || staff.role !== 'staff' || staff.office !== officeId) return fail('You can set the deadline only for your own office.');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || isNaN(new Date(date + 'T00:00:00'))) return fail('Please choose a valid date.');
@@ -356,7 +397,7 @@ const DB = (() => {
     } catch (e) { console.error(e); return fail(authMsg(e)); }
   }
 
-  return { login, logout, currentUser, register, changePin, sendResetLink, verifyResetLink, resetWithLink,
+  return { login, logout, currentUser, register, changePin, sendResetLink, isResetLink, rememberedResetEmail, resetWithEmailLink, verifyResetLink, resetWithLink,
            getDeadline, getDeadlines, getOffice, getClearances, getNotifications, unreadCount, markRead,
            searchStudent, updateClearance, setOfficeDeadline, listStudents, updateGroup, ensureDeadlineReminder };
 })();
