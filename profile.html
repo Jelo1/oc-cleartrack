@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Profile – ClearTrack</title>
+  <link rel="icon" type="image/png" href="img/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="layout">
+  <header class="topbar" id="topbar"></header>
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <main class="content">
+    <div class="page narrow">
+      <div class="page-head">
+        <div>
+          <p class="kicker">Account</p>
+          <h1>Profile</h1>
+          <p class="sub">Your student information and account settings.</p>
+        </div>
+      </div>
+
+      <section class="card pcard">
+        <span class="big-avatar" id="avatar"></span>
+        <div><h2 id="pname"></h2><p class="sub" id="pmeta"></p></div>
+      </section>
+
+      <section class="card info-list">
+        <h3>Student information</h3>
+        <div id="info"></div>
+      </section>
+
+      <section class="card info-list">
+        <h3>Account settings</h3>
+        <p class="sub" style="font-size:14px;margin-bottom:4px">Manage your security and notification preferences.</p>
+        <a class="setting-row" href="change-pin.html">
+          <span class="oicon"></span>
+          <span><strong>Change PIN</strong><small>Update your 4-digit PIN</small></span>
+          <span class="chev" id="chev"></span>
+        </a>
+      </section>
+
+      <button class="btn btn-danger" id="signout" type="button">Sign Out</button>
+    </div>
+  </main>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/data.firebase.js"></script>
+<script src="js/app.js"></script>
+<script>
+(async () => {
+  const user = await UI.require('student'); if (!user) return;
+  await UI.mountShell(user, 'profile');
+
+  $('#avatar').innerHTML = UI.icon('user', 40);
+  $('#pname').textContent = user.name;
+  $('#pmeta').textContent = UI.courseLine(user);
+  $('.setting-row .oicon').innerHTML = UI.icon('lock', 20);
+  $('#chev').innerHTML = UI.icon('arrow', 20);
+
+  const info = [
+    ['Student ID', user.studentId || 'Not set'],
+    ['Course', user.course],
+    ['Year level', user.year],
+    ['School email', user.email]
+  ];
+  $('#info').innerHTML = info.map(([k, v]) => `<div class="info-row"><span>${k}</span><span>${esc(v)}</span></div>`).join('');
+
+  $('#signout').addEventListener('click', async () => { await DB.logout(); location.href = 'index.html'; });
+})();
+</script>
+</body>
+</html>

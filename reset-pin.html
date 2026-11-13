@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reset PIN – ClearTrack</title>
+  <link rel="icon" type="image/png" href="img/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="auth">
+  <aside class="auth-aside">
+    <a class="brand" href="index.html"><img class="brand-logo" src="img/logo.png" width="46" height="46" alt="Olivarez College ClearTrack logo"><span class="brand-text"><strong>ClearTrack</strong><small>OLIVAREZ COLLEGE</small></span></a>
+    <div class="aside-body">
+      <p class="kicker">Authentication</p>
+      <h1>Choose a new PIN.</h1>
+      <p>Your reset link was verified. Create a new four-digit PIN for your account.</p>
+      <div class="aside-card">
+        <span class="ic" id="ic-lock"></span>
+        <div><strong>Secure link</strong><span>Reset links work once and expire after a short time.</span></div>
+      </div>
+    </div>
+    <p class="aside-foot">Olivarez College • ClearTrack</p>
+  </aside>
+
+  <main class="auth-main">
+    <div class="auth-card">
+      <p class="kicker">Account recovery</p>
+      <h2 id="title">Reset PIN</h2>
+      <p class="sub" id="subtitle">Checking your reset link…</p>
+
+      <ol class="steps" style="margin-top:22px">
+        <li class="done"><span class="n">1</span><span>College email</span></li>
+        <li class="done"><span class="n">2</span><span>Check your email</span></li>
+        <li class="on"><span class="n">3</span><span>Reset PIN</span></li>
+      </ol>
+
+      <p class="form-error" id="err" role="alert" tabindex="-1" hidden></p>
+
+      <form id="form" novalidate hidden>
+        <div class="field">
+          <label for="pin">New 4-digit PIN</label>
+          <div class="pin-wrap">
+            <input class="input" id="pin" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="new-password" required>
+            <button type="button">Show</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="pin2">Confirm new PIN</label>
+          <div class="pin-wrap">
+            <input class="input" id="pin2" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="new-password" required>
+            <button type="button">Show</button>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-block" type="submit">Reset PIN</button>
+      </form>
+
+      <a class="btn btn-outline btn-block" id="again" href="forgot-pin.html" hidden>Request a new link</a>
+
+      <a class="back-link" href="index.html">Back to Sign In</a>
+    </div>
+  </main>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/data.firebase.js"></script>
+<script src="js/app.js"></script>
+<script>
+(async () => {
+  $('#ic-lock').innerHTML = UI.icon('lock', 22);
+  UI.pinToggle();
+
+  const err = $('#err'), form = $('#form');
+  const q = new URLSearchParams(location.search);
+  const code = q.get('oobCode');
+
+  if (q.get('mode') !== 'resetPassword' || !code) {
+    $('#subtitle').textContent = 'This page needs a reset link from your email.';
+    UI.showError(err, 'Reset link is missing. Please request a new one.');
+    $('#again').hidden = false; return;
+  }
+
+  const v = await DB.verifyResetLink(code);
+  if (!v.ok) {
+    $('#subtitle').textContent = 'We could not use this link.';
+    UI.showError(err, v.error); $('#again').hidden = false; return;
+  }
+  $('#subtitle').textContent = `Create a new 4-digit PIN for ${v.email}.`;
+  form.hidden = false; $('#pin').focus();
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const pin = $('#pin').value, pin2 = $('#pin2').value;
+    if (!/^\d{4}$/.test(pin)) return UI.showError(err, 'PIN must be exactly 4 digits.');
+    if (pin !== pin2) return UI.showError(err, 'PINs do not match.');
+    const r = await DB.resetWithLink(code, pin);
+    if (!r.ok) { UI.showError(err, r.error); if (/expired|invalid/i.test(r.error)) { form.hidden = true; $('#again').hidden = false; } return; }
+    UI.flash('PIN updated. Please sign in.');
+    location.href = 'index.html';
+  });
+})();
+</script>
+</body>
+</html>

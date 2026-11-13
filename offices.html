@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Offices / Location – ClearTrack</title>
+  <link rel="icon" type="image/png" href="img/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="layout">
+  <header class="topbar" id="topbar"></header>
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <main class="content">
+    <div class="page">
+      <div class="page-head">
+        <div>
+          <p class="kicker">Student clearance</p>
+          <h1>Olivarez College Offices</h1>
+          <p class="sub">Find office locations and review your clearance status.</p>
+        </div>
+        <p class="meta" id="meta"></p>
+      </div>
+      <div class="ogrid" id="grid"></div>
+    </div>
+  </main>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/data.firebase.js"></script>
+<script src="js/app.js"></script>
+<script>
+(async () => {
+  const user = await UI.require('student'); if (!user) return;
+  await UI.mountShell(user, 'offices');
+
+  const rows = await DB.getClearances(user.email);
+  const sum = UI.summarize(rows);
+  $('#meta').textContent = `${sum.total} assigned offices • ${sum.cleared} cleared`;
+
+  $('#grid').innerHTML = rows.map(r => `
+    <article class="card ocard">
+      <div class="top"><span class="oicon">${UI.icon('building', 22)}</span>${UI.badge(r.status)}</div>
+      <h3>${esc(r.office.name)}</h3>
+      <p class="loc">${UI.icon('pin', 16)}${esc(r.office.location)}</p>
+      <p class="req">${esc(r.requirement || 'No requirements remaining')}</p>
+      ${UI.dueLine(r)}
+      <a class="btn btn-outline btn-block" href="office-info.html?o=${r.office.id}">View Details ${UI.icon('arrow', 16)}</a>
+    </article>`).join('');
+})();
+</script>
+</body>
+</html>

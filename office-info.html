@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Office Information – ClearTrack</title>
+  <link rel="icon" type="image/png" href="img/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="layout">
+  <header class="topbar" id="topbar"></header>
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <main class="content">
+    <div class="page">
+      <div class="page-head">
+        <div>
+          <p class="kicker">Office information</p>
+          <h1>Office Information</h1>
+          <p class="sub">Requirements and details for your Olivarez College clearance.</p>
+        </div>
+      </div>
+
+      <div style="max-width:760px">
+        <div class="banner" id="banner"></div>
+      </div>
+
+      <article class="card detail" id="detail"></article>
+
+      <div class="actions"><a class="btn btn-outline" href="offices.html">← Back to Clearance List</a></div>
+    </div>
+  </main>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/data.firebase.js"></script>
+<script src="js/app.js"></script>
+<script>
+(async () => {
+  const user = await UI.require('student'); if (!user) return;
+  const from = new URLSearchParams(location.search).get('from');
+  await UI.mountShell(user, ['home', 'notifications'].includes(from) ? from : 'offices');
+
+  const rows = await DB.getClearances(user.email);
+  const id = new URLSearchParams(location.search).get('o');
+  const r = rows.find(x => x.office.id === id) || rows.find(x => x.status === 'requirement') || rows[0];
+
+  const B = {
+    requirement: ['warn', 'alert', 'This office has an outstanding requirement', `Complete the action below before ${UI.fmtLong(r.deadline)}.`],
+    pending:     ['info', 'clock', 'Waiting for office review', 'No action needed yet. The office will update your status.'],
+    cleared:     ['ok',   'check', 'You are cleared for this office', 'No requirements remaining.']
+  }[r.status];
+  $('#banner').className = 'banner ' + B[0];
+  $('#banner').innerHTML = `${UI.icon(B[1], 22)}<div><strong>${B[2]}</strong><span>${B[3]}</span></div>`;
+
+  const reqTitle = r.status === 'requirement' ? r.requirement
+                 : r.status === 'pending' ? 'Waiting for office review'
+                 : 'No requirements remaining';
+  const reqNote = (r.updated ? `Updated${r.by ? ' by ' + esc(r.by) : ''} on ${UI.fmtDate(r.updated)}` : '')
+                + (r.status !== 'cleared' && r.deadline ? ` • Deadline ${UI.fmtDate(r.deadline)}` : '');
+
+  $('#detail').innerHTML = `
+    <div class="detail-head">
+      <span class="oicon">${UI.icon('building', 26)}</span>
+      <div><h2>${esc(r.office.name)}</h2>${UI.badge(r.status)}</div>
+    </div>
+    <div class="detail-info">
+      <div><p class="dl-label">${UI.icon('pin', 15)}Location</p><p class="dl-value">${esc(r.office.location)}</p></div>
+      <div><p class="dl-label">${UI.icon('clock', 15)}Office hours</p><p class="dl-value">${esc(r.office.hours)}</p></div>
+    </div>
+    <div class="req-box ${r.status === 'requirement' ? 'warn' : ''}">
+      <p class="dl-label">Clearance requirement</p>
+      <strong>${esc(reqTitle)}</strong>
+      <small>${reqNote}</small>
+    </div>`;
+})();
+</script>
+</body>
+</html>

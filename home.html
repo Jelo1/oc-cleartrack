@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Home – ClearTrack</title>
+  <link rel="icon" type="image/png" href="img/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="layout">
+  <header class="topbar" id="topbar"></header>
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <main class="content">
+    <div class="page">
+      <div class="page-head">
+        <div>
+          <p class="kicker">Student home</p>
+          <h1 id="welcome">Welcome!</h1>
+          <p class="sub">Review your clearance progress and the requirements still to complete.</p>
+        </div>
+      </div>
+
+      <div class="banner warn" id="reminder" role="status" hidden></div>
+
+      <section class="card profile-card" aria-label="Your profile">
+        <span class="avatar" id="avatar"></span>
+        <div><strong id="pname"></strong><span class="sub" id="pmeta"></span></div>
+        <a class="btn btn-outline btn-sm" href="profile.html">View Profile</a>
+      </section>
+
+      <section class="stats" aria-label="Clearance summary">
+        <div class="card stat accent">
+          <p class="label">Your Clearance</p>
+          <p class="big"><span id="cleared">0</span><small>of <span id="total">0</span> offices cleared</small></p>
+          <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="barwrap"><i id="bar" style="width:0%"></i></div>
+        </div>
+        <div class="card stat">
+          <p class="label">Outstanding offices</p>
+          <p class="big"><span id="outCount">0</span><small>offices</small></p>
+          <p class="note" id="outNames"></p>
+        </div>
+        <div class="card stat">
+          <p class="label">Next deadline</p>
+          <p class="big" id="deadline" style="font-size:30px"></p>
+          <p class="note"><span id="dleft"></span> · Complete all office requirements.</p>
+        </div>
+      </section>
+
+      <section class="card" aria-label="Clearance overview">
+        <div class="section-title">
+          <h2>Clearance overview</h2>
+          <p>Current status across assigned offices.</p>
+        </div>
+        <div class="ctable">
+          <div class="chead"><span>Office</span><span>Requirement</span><span>Status</span><span></span></div>
+          <div id="rows"></div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/data.firebase.js"></script>
+<script src="js/app.js"></script>
+<script>
+(async () => {
+  const user = await UI.require('student'); if (!user) return;
+  const rows = await DB.getClearances(user.email);
+  const sum = UI.summarize(rows);
+  const next = UI.nextDeadline(rows);
+  await DB.ensureDeadlineReminder(user, rows);   // adds the "deadline tomorrow" notification
+  await UI.mountShell(user, 'home');
+
+  const soon = sum.out.filter(r => r.deadline && UI.daysUntil(r.deadline) >= 0 && UI.daysUntil(r.deadline) <= 1);
+  if (soon.length) {
+    const when = soon.some(r => UI.daysUntil(r.deadline) === 0) ? 'today' : 'tomorrow';
+    const b = $('#reminder');
+    b.innerHTML = `${UI.icon('alert', 22)}<div><strong>Deadline ${when}</strong><span>${esc(UI.joinNames(soon.map(r => r.office.short)))}: finish your requirements ${when}.</span></div>`;
+    b.hidden = false;
+  }
+
+  $('#welcome').textContent = `Welcome, ${UI.firstName(user)}!`;
+  $('#avatar').innerHTML = UI.icon('user', 24);
+  $('#pname').textContent = user.name;
+  $('#pmeta').textContent = `${UI.courseLine(user)} • AY 2026–2027`;
+
+  $('#cleared').textContent = sum.cleared;
+  $('#total').textContent = sum.total;
+  $('#barwrap').setAttribute('aria-valuenow', sum.pct);
+  requestAnimationFrame(() => { $('#bar').style.width = sum.pct + '%'; });
+
+  $('#outCount').textContent = sum.out.length;
+  $('#outNames').textContent = sum.out.length ? UI.joinNames(sum.out.map(r => r.office.short)) : 'All offices cleared. Nice work!';
+  $('#deadline').textContent = next ? UI.fmtDate(next) : '—';
+  $('#dleft').textContent = next ? UI.daysLeft(next) : 'All offices cleared';
+
+  $('#rows').innerHTML = rows.map(r => `
+    <div class="crow">
+      <span class="oname">${esc(r.office.name)}</span>
+      <span class="req">${esc(r.requirement || 'No requirements remaining')}${UI.dueLine(r)}</span>
+      <span class="stat-cell">${UI.badge(r.status)}</span>
+      <span class="link-cell"><a class="link-btn" href="office-info.html?o=${r.office.id}&from=home">View Details ${UI.icon('arrow', 14)}</a></span>
+    </div>`).join('');
+})();
+</script>
+</body>
+</html>

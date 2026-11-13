@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Create account – ClearTrack</title>
+  <link rel="icon" type="image/png" href="img/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="auth">
+  <aside class="auth-aside">
+    <a class="brand" href="index.html"><img class="brand-logo" src="img/logo.png" width="46" height="46" alt="Olivarez College ClearTrack logo"><span class="brand-text"><strong>ClearTrack</strong><small>OLIVAREZ COLLEGE</small></span></a>
+    <div class="aside-body">
+      <p class="kicker">Authentication</p>
+      <h1>Your clearance, in one place.</h1>
+      <p>Track office requirements, review updates and manage your Olivarez College clearance.</p>
+      <div class="aside-card">
+        <span class="ic" id="ic-users"></span>
+        <div><strong>Students and staff</strong><span>Student credentials open Home. Staff credentials open the Staff Portal.</span></div>
+      </div>
+    </div>
+    <p class="aside-foot">Olivarez College • ClearTrack</p>
+  </aside>
+
+  <main class="auth-main">
+    <div class="auth-card">
+      <p class="kicker">Create your account</p>
+      <h2>Create Account</h2>
+      <p class="sub">Register with your Olivarez College email.</p>
+
+      <form id="form" novalidate>
+        <div class="field">
+          <label for="email">Olivarez College email</label>
+          <input class="input" id="email" type="email" autocomplete="email" placeholder="name@olivarezcollege.edu.ph" required>
+        </div>
+        <div class="field">
+          <label for="name">Full name</label>
+          <input class="input" id="name" type="text" autocomplete="name" placeholder="Juan Dela Cruz" required>
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label for="course">Course</label>
+            <select class="input" id="course" required>
+              <option value="">Select course</option>
+              <option>BSIT</option><option>BSCS</option><option>BSBA</option><option>BSED</option>
+              <option>BSHM</option><option>BSA</option><option>BSCrim</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="year">Year level</label>
+            <select class="input" id="year" required>
+              <option value="">Select year level</option>
+              <option>1st year</option><option>2nd year</option><option>3rd year</option><option>4th year</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label for="pin">Create a 4-digit PIN</label>
+            <div class="pin-wrap">
+              <input class="input" id="pin" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="new-password" required>
+              <button type="button">Show</button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="pin2">Confirm PIN</label>
+            <div class="pin-wrap">
+              <input class="input" id="pin2" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="new-password" required>
+              <button type="button">Show</button>
+            </div>
+          </div>
+        </div>
+        <p class="field-hint">Use exactly 4 numbers. Both PIN entries must match.</p>
+        <p class="form-error" id="err" role="alert" tabindex="-1" hidden></p>
+        <button class="btn btn-primary btn-block" type="submit">Create Account</button>
+      </form>
+      <a class="btn btn-outline btn-block" href="index.html" style="margin-top:12px">Back to Sign In</a>
+    </div>
+  </main>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/data.firebase.js"></script>
+<script src="js/app.js"></script>
+<script>
+(async () => {
+  $('#ic-users').innerHTML = UI.icon('users', 22);
+  UI.pinToggle();
+  const err = $('#err');
+
+  $('#form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const v = id => $('#' + id).value.trim();
+    const email = v('email').toLowerCase(), name = v('name'), course = v('course'), year = v('year'), pin = v('pin'), pin2 = v('pin2');
+
+    const problem = UI.checkEmail(email)
+      || (!name ? 'Please enter your full name.' : '')
+      || (!course ? 'Please select your course.' : '')
+      || (!year ? 'Please select your year level.' : '')
+      || (!/^\d{4}$/.test(pin) ? 'PIN must be exactly 4 digits.' : '')
+      || (pin !== pin2 ? 'PINs do not match.' : '');
+    if (problem) return UI.showError(err, problem);
+
+    const r = await DB.register({ email, name, course, year, pin });
+    if (!r.ok) return UI.showError(err, r.error);
+    UI.flash('Account created. Please sign in.');
+    location.href = 'index.html';
+  });
+})();
+</script>
+</body>
+</html>

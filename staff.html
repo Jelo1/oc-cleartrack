@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Staff Portal – ClearTrack</title>
+  <link rel="icon" type="image/png" href="img/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="layout">
+  <header class="topbar" id="topbar"></header>
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <main class="content">
+    <div class="page">
+      <div class="page-head">
+        <div>
+          <p class="kicker" id="crumb">Staff</p>
+          <h1>Student clearance</h1>
+          <p class="sub" id="lead"></p>
+        </div>
+      </div>
+
+      <div class="banner ok" id="saved" role="status" hidden></div>
+
+      <!-- Office deadline -->
+      <section class="card search-card">
+        <h2>Office deadline</h2>
+        <p class="sub" style="margin:-6px 0 14px;font-size:14px">Students see this date next to your office on their Home page and get a reminder one day before.</p>
+        <form id="dlform" class="search-row" novalidate>
+          <div style="flex:1">
+            <label class="label" for="dl">Clearance deadline for <span id="dloffice"></span></label>
+            <input class="input" id="dl" type="date">
+          </div>
+          <button class="btn btn-primary" type="submit" style="align-self:flex-end">Save deadline</button>
+        </form>
+        <p class="form-error" id="dlerr" role="alert" hidden style="margin:14px 0 0"></p>
+      </section>
+
+      <!-- Who to update -->
+      <div class="seg seg2" role="radiogroup" aria-label="Who to update">
+        <label><input type="radio" name="mode" value="one" checked><span>One student</span></label>
+        <label><input type="radio" name="mode" value="many"><span>Many students</span></label>
+      </div>
+
+      <div id="one">
+      <section class="card search-card">
+        <h2>Search student</h2>
+        <form id="search" class="search-row" novalidate>
+          <div style="flex:1">
+            <label class="label" for="q">Student email or ID</label>
+            <input class="input" id="q" type="text" placeholder="Student email or ID" autocomplete="off">
+          </div>
+          <button class="btn btn-primary" type="submit" style="align-self:flex-end"><span id="ic-search"></span>Search</button>
+        </form>
+      </section>
+
+      <!-- Before searching / not found -->
+      <section class="state-box" id="empty">
+        <div class="ic" id="ic-empty"></div>
+        <strong id="emptyTitle">Search to begin</strong>
+        <span id="emptyText">Enter a student email or ID to view and update clearance status.</span>
+      </section>
+
+      <!-- After searching -->
+      <div class="staff-grid" id="result" hidden>
+        <section class="card found">
+          <p class="kicker">Student found</p>
+          <div class="person">
+            <span class="avatar" id="savatar"></span>
+            <div><strong id="sname"></strong><small id="smeta"></small></div>
+          </div>
+          <div class="info-row"><span>Student ID</span><span id="sid"></span></div>
+          <div class="info-row"><span>Current status</span><span id="sstatus"></span></div>
+          <div class="info-row"><span>Last updated</span><span id="supdated"></span></div>
+        </section>
+
+        <section class="card setpanel">
+          <h2 id="setTitle">Set status</h2>
+          <form id="update" novalidate>
+            <div class="seg" role="radiogroup" aria-label="Clearance status">
+              <label><input type="radio" name="status" value="cleared"><span>Cleared</span></label>
+              <label><input type="radio" name="status" value="pending"><span>Pending</span></label>
+              <label><input type="radio" name="status" value="requirement"><span>Has Requirement</span></label>
+            </div>
+            <div class="field">
+              <label for="req">Clearance requirement</label>
+              <input class="input" id="req" type="text" placeholder="e.g., Return Library Card">
+            </div>
+            <div class="field">
+              <label for="note">Staff notification (message to the student)</label>
+              <textarea class="input" id="note" placeholder="e.g., Please return your Library Card to the Library."></textarea>
+            </div>
+            <p class="form-error" id="err" role="alert" tabindex="-1" hidden></p>
+            <button class="btn btn-primary" type="submit">Save</button>
+          </form>
+        </section>
+      </div>
+      </div><!-- /one -->
+
+      <!-- Many students -->
+      <section class="card setpanel" id="many" hidden>
+        <h2 id="bulkTitle">Update many students</h2>
+        <form id="bulk" novalidate>
+          <div class="grid-2">
+            <div class="field">
+              <label for="bcourse">Course</label>
+              <select class="input" id="bcourse">
+                <option value="">All courses</option>
+                <option>BSIT</option><option>BSCS</option><option>BSBA</option><option>BSED</option>
+                <option>BSHM</option><option>BSA</option><option>BSCrim</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="byear">Year level</label>
+              <select class="input" id="byear">
+                <option value="">All year levels</option>
+                <option>1st year</option><option>2nd year</option><option>3rd year</option><option>4th year</option>
+              </select>
+            </div>
+          </div>
+          <div class="seg" role="radiogroup" aria-label="Clearance status for the group">
+            <label><input type="radio" name="bstatus" value="cleared"><span>Cleared</span></label>
+            <label><input type="radio" name="bstatus" value="pending"><span>Pending</span></label>
+            <label><input type="radio" name="bstatus" value="requirement" checked><span>Has Requirement</span></label>
+          </div>
+          <div class="field">
+            <label for="breq">Clearance requirement</label>
+            <input class="input" id="breq" type="text" placeholder="e.g., Return Library Card">
+          </div>
+          <div class="field">
+            <label for="bnote">Staff notification (message to the students)</label>
+            <textarea class="input" id="bnote" placeholder="e.g., Please settle this requirement before the deadline."></textarea>
+          </div>
+          <label class="check"><input type="checkbox" id="skip" checked> Skip students who are already cleared</label>
+          <p class="form-error" id="berr" role="alert" tabindex="-1" hidden></p>
+          <button class="btn btn-primary" type="submit" id="bgo">Review and apply</button>
+        </form>
+      </section>
+    </div>
+  </main>
+</div>
+
+<dialog class="dlg" id="confirm" aria-labelledby="cTitle">
+  <h3 id="cTitle"></h3>
+  <p id="cText"></p>
+  <div class="dlg-actions">
+    <button class="btn btn-outline" id="cNo" type="button">Cancel</button>
+    <button class="btn btn-primary" id="cYes" type="button">Apply</button>
+  </div>
+</dialog>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/data.firebase.js"></script>
+<script src="js/app.js"></script>
+<script>
+(async () => {
+  const staff = await UI.require('staff'); if (!staff) return;
+  await UI.mountShell(staff, 'staff');
+
+  const office = OFFICES.find(o => o.id === staff.office);
+  $('#crumb').textContent = `Staff / ${office.short}`;
+  $('#lead').textContent = `Search for a student and update their ${office.short} clearance status.`;
+  $('#setTitle').textContent = `Set status for ${office.short}`;
+  $('#ic-search').innerHTML = UI.icon('search', 18);
+  $('#ic-empty').innerHTML = UI.icon('search', 26);
+  $('#savatar').innerHTML = UI.icon('user', 20);
+
+  let student = null;
+  const err = $('#err'), saved = $('#saved');
+
+  function show(found) {
+    $('#empty').hidden = found; $('#result').hidden = !found;
+  }
+
+  async function paintStudent() {
+    const rows = await DB.getClearances(student.email);
+    const mine = rows.find(r => r.office.id === office.id);
+    $('#sname').textContent = student.name;
+    $('#smeta').textContent = UI.courseLine(student);
+    $('#sid').textContent = student.studentId || 'Not set';
+    $('#sstatus').innerHTML = UI.badge(mine.status);
+    $('#supdated').textContent = UI.fmtDate(mine.updated);
+    $(`input[name=status][value=${mine.status}]`).checked = true;
+    $('#req').value = mine.requirement || '';
+    $('#note').value = '';
+  }
+
+  $('#search').addEventListener('submit', async e => {
+    e.preventDefault();
+    saved.hidden = true; UI.showError(err, '');
+    const q = $('#q').value.trim();
+    if (!q) { $('#emptyTitle').textContent = 'Search to begin'; $('#emptyText').textContent = 'Enter a student email or ID to view and update clearance status.'; return show(false); }
+    student = await DB.searchStudent(q);
+    if (!student) {
+      $('#emptyTitle').textContent = 'Student not found';
+      $('#emptyText').textContent = 'Check the email or ID number and try again.';
+      return show(false);
+    }
+    await paintStudent(); show(true);
+  });
+
+  $('#update').addEventListener('submit', async e => {
+    e.preventDefault();
+    const status = $('input[name=status]:checked')?.value;
+    const requirement = $('#req').value.trim(), note = $('#note').value.trim();
+    if (!status) return UI.showError(err, 'Please choose a status.');
+    if (status === 'requirement' && !requirement) return UI.showError(err, 'Enter the requirement the student must complete.');
+
+    const r = await DB.updateClearance(student.email, office.id, { status, requirement: status === 'cleared' ? '' : requirement, note }, staff);
+    if (!r.ok) return UI.showError(err, r.error);
+
+    UI.showError(err, '');
+    saved.innerHTML = `${UI.icon('check', 22)}<div><strong>Status updated.</strong><span>The student has been notified.</span></div>`;
+    saved.hidden = false;
+    await paintStudent();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  /* ---------- office deadline ---------- */
+  const dlerr = $('#dlerr');
+  $('#dloffice').textContent = office.short;
+  $('#dl').value = (await DB.getDeadlines())[office.id] || '';
+  $('#dlform').addEventListener('submit', async e => {
+    e.preventDefault();
+    UI.showError(dlerr, ''); saved.hidden = true;
+    const r = await DB.setOfficeDeadline(office.id, $('#dl').value, staff);
+    if (!r.ok) return UI.showError(dlerr, r.error);
+    saved.innerHTML = `${UI.icon('check', 22)}<div><strong>Deadline saved.</strong><span>Students now see ${UI.fmtLong($('#dl').value)} for ${esc(office.short)}.</span></div>`;
+    saved.hidden = false;
+  });
+
+  /* ---------- one student / many students ---------- */
+  $$('input[name=mode]').forEach(r => r.addEventListener('change', () => {
+    const many = $('input[name=mode]:checked').value === 'many';
+    $('#one').hidden = many; $('#many').hidden = !many; saved.hidden = true;
+  }));
+  $('#bulkTitle').textContent = `Update many students: ${office.short}`;
+
+  function ask(title, html, yes) {
+    return new Promise(res => {
+      const d = $('#confirm');
+      $('#cTitle').textContent = title; $('#cText').innerHTML = html; $('#cYes').textContent = yes;
+      d.returnValue = '';
+      $('#cYes').onclick = () => d.close('yes');
+      $('#cNo').onclick = () => d.close('no');
+      d.onclose = () => res(d.returnValue === 'yes');
+      d.showModal();
+    });
+  }
+
+  const berr = $('#berr'), go = $('#bgo');
+  $('#bulk').addEventListener('submit', async e => {
+    e.preventDefault();
+    saved.hidden = true; UI.showError(berr, '');
+    const status = $('input[name=bstatus]:checked')?.value;
+    const requirement = $('#breq').value.trim(), note = $('#bnote').value.trim();
+    const course = $('#bcourse').value, year = $('#byear').value, skip = $('#skip').checked;
+    if (!status) return UI.showError(berr, 'Please choose a status.');
+    if (status === 'requirement' && !requirement) return UI.showError(berr, 'Enter the requirement the students must complete.');
+
+    const reset = () => { go.disabled = false; go.textContent = 'Review and apply'; };
+    go.disabled = true; go.textContent = 'Finding students…';
+    let list;
+    try { list = await DB.listStudents({ course, year }); }
+    catch (err2) { console.error(err2); reset(); return UI.showError(berr, 'Could not load the students. Please try again.'); }
+    if (!list.length) { reset(); return UI.showError(berr, 'No students found for that course and year level.'); }
+
+    const group = [course || 'All courses', year || 'All year levels'].join(' • ');
+    const label = STATUS[status].label + (status === 'cleared' || !requirement ? '' : ': ' + requirement);
+    const yes = await ask(
+      `Apply to ${list.length} student${list.length === 1 ? '' : 's'}?`,
+      `<strong>${esc(group)}</strong><br>${esc(label)}<br>${skip ? 'Students who are already cleared will be skipped.' : 'Students who are already cleared will also be changed.'}`,
+      'Apply');
+    if (!yes) return reset();
+
+    const r = await DB.updateGroup(list, office.id, { status, requirement: status === 'cleared' ? '' : requirement, note }, staff,
+      { skipCleared: skip, onProgress: (d, t) => { go.textContent = `Updating… ${d}/${t}`; } });
+    reset();
+    if (!r.ok) return UI.showError(berr, r.error);
+    saved.innerHTML = `${UI.icon('check', 22)}<div><strong>${r.updated} student${r.updated === 1 ? '' : 's'} updated.</strong><span>${r.skipped ? r.skipped + ' already cleared ' + (r.skipped === 1 ? 'was' : 'were') + ' skipped. ' : ''}Each student was notified in the app.</span></div>`;
+    saved.hidden = false;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+})();
+</script>
+</body>
+</html>

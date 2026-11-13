@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Forgot PIN – ClearTrack</title>
+  <link rel="icon" type="image/png" href="img/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="auth">
+  <aside class="auth-aside">
+    <a class="brand" href="index.html"><img class="brand-logo" src="img/logo.png" width="46" height="46" alt="Olivarez College ClearTrack logo"><span class="brand-text"><strong>ClearTrack</strong><small>OLIVAREZ COLLEGE</small></span></a>
+    <div class="aside-body">
+      <p class="kicker">Authentication</p>
+      <h1>Recover access to your account.</h1>
+      <p>Use your registered college email to verify your identity and create a new PIN.</p>
+      <div class="aside-card">
+        <span class="ic" id="ic-lock"></span>
+        <div><strong>College email</strong><span>We email you a link to set a new four-digit PIN.</span></div>
+      </div>
+    </div>
+    <p class="aside-foot">Olivarez College • ClearTrack</p>
+  </aside>
+
+  <main class="auth-main">
+    <div class="auth-card">
+      <p class="kicker">Account recovery</p>
+      <h2 id="title">Forgot PIN?</h2>
+      <p class="sub" id="subtitle">Enter your Olivarez email and we’ll send a reset link.</p>
+
+      <ol class="steps" id="steps" style="margin-top:22px">
+        <li class="on"><span class="n">1</span><span>College email</span></li>
+        <li><span class="n">2</span><span>Check your email</span></li>
+        <li><span class="n">3</span><span>Reset PIN</span></li>
+      </ol>
+
+      <p class="form-error" id="err" role="alert" tabindex="-1" hidden></p>
+
+      <!-- STEP 1: email -->
+      <form id="step1" novalidate>
+        <div class="field">
+          <label for="email">Registered college email</label>
+          <input class="input" id="email" type="email" autocomplete="email" placeholder="name@olivarezcollege.edu.ph" required>
+        </div>
+        <button class="btn btn-primary btn-block" type="submit">Send Reset Link</button>
+      </form>
+
+      <!-- STEP 2: check email -->
+      <div id="step2" hidden>
+        <div class="banner info">
+          <span id="ic-mail"></span>
+          <div><strong>Check your email</strong><span id="codeMsg"></span></div>
+        </div>
+        <p class="sub" style="margin:14px 0">Open the link in the email, then choose your new 4-digit PIN. The email can take a minute and may land in Spam.</p>
+        <button class="btn btn-outline btn-block" type="button" id="resend">Send the link again</button>
+      </div>
+
+      <a class="back-link" href="index.html">Back to Sign In</a>
+    </div>
+  </main>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/data.firebase.js"></script>
+<script src="js/app.js"></script>
+<script>
+(() => {
+  $('#ic-lock').innerHTML = UI.icon('lock', 22);
+  $('#ic-mail').innerHTML = UI.icon('mail', 20);
+
+  const err = $('#err');
+  let email = '';
+
+  function go(n) {
+    UI.showError(err, '');
+    [1, 2].forEach(i => { $('#step' + i).hidden = i !== n; });
+    $$('#steps li').forEach((li, i) => { li.classList.toggle('on', i + 1 === n); li.classList.toggle('done', i + 1 < n); });
+    $('#title').textContent = n === 1 ? 'Forgot PIN?' : 'Check your email';
+    $('#subtitle').textContent = n === 1 ? 'Enter your Olivarez email and we’ll send a reset link.' : 'We sent you a link to reset your PIN.';
+    const first = $('#step' + n + ' input'); if (first) first.focus();
+  }
+
+  async function send(btn) {
+    const old = btn.textContent; btn.disabled = true; btn.textContent = 'Sending…';
+    const r = await DB.sendResetLink(email);
+    btn.disabled = false; btn.textContent = old;
+    return r;
+  }
+
+  $('#step1').addEventListener('submit', async e => {
+    e.preventDefault();
+    email = $('#email').value.trim().toLowerCase();
+    const bad = UI.checkEmail(email); if (bad) return UI.showError(err, bad);
+    const r = await send($('#step1 button[type=submit]'));
+    if (!r.ok) return UI.showError(err, r.error);
+    /* For privacy, Firebase does not tell us whether the email has an account. */
+    $('#codeMsg').textContent = `If an account exists for ${email.replace(/^(.{2}).*(@.*)$/, '$1••$2')}, a reset link is on its way.`;
+    go(2);
+  });
+
+  $('#resend').addEventListener('click', async e => {
+    const r = await send(e.currentTarget);
+    if (!r.ok) return UI.showError(err, r.error);
+    UI.toast('Reset link sent again.', 'info');
+  });
+})();
+</script>
+</body>
+</html>
