@@ -30,9 +30,52 @@
         <div><h2 id="pname"></h2><p class="sub" id="pmeta"></p></div>
       </section>
 
+      <div class="banner ok" id="saved" role="status" hidden></div>
+
       <section class="card info-list">
-        <h3>Student information</h3>
+        <div class="sec-head"><h3>Student information</h3><button class="btn btn-outline btn-sm" id="editbtn" type="button">Edit profile</button></div>
         <div id="info"></div>
+        <form id="editform" novalidate hidden style="padding:6px 0 18px">
+          <div class="field">
+            <label for="ename">Full name</label>
+            <input class="input" id="ename" type="text" maxlength="80" autocomplete="name">
+          </div>
+          <div class="grid-2">
+            <div class="field">
+              <label for="eid">Student ID number</label>
+              <input class="input" id="eid" type="text" maxlength="20" placeholder="e.g., 2024-00123" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="esec">Section (optional)</label>
+              <input class="input" id="esec" type="text" maxlength="10" placeholder="e.g., 2A" autocomplete="off">
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="field">
+              <label for="ecourse">Course</label>
+              <select class="input" id="ecourse">
+                <option>BSIT</option><option>BSCS</option><option>BSBA</option><option>BSED</option>
+                <option>BSHM</option><option>BSA</option><option>BSCrim</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="eyear">Year level</label>
+              <select class="input" id="eyear">
+                <option>1st year</option><option>2nd year</option><option>3rd year</option><option>4th year</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="eemail">School email</label>
+            <input class="input" id="eemail" type="email" disabled>
+            <p class="field-hint" style="margin:6px 0 0">Your school email is your login, so it cannot be changed.</p>
+          </div>
+          <p class="form-error" id="eerr" role="alert" tabindex="-1" hidden></p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn btn-primary" type="submit" id="esave">Save changes</button>
+            <button class="btn btn-outline" type="button" id="ecancel">Cancel</button>
+          </div>
+        </form>
       </section>
 
       <section class="card info-list">
@@ -43,6 +86,14 @@
           <span><strong>Change PIN</strong><small>Update your 4-digit PIN</small></span>
           <span class="chev" id="chev"></span>
         </a>
+      </section>
+
+      <section class="card info-list">
+        <h3>Help &amp; support</h3>
+        <p class="sub" style="font-size:14px;margin-bottom:4px">Problem with your clearance or account? Contact the help desk.</p>
+        <div class="info-row"><span>Email</span><span><a href="mailto:cleartracksupport@olivarezcollege.edu.ph">cleartracksupport@olivarezcollege.edu.ph</a></span></div>
+        <div class="info-row"><span>Help desk</span><span>New IT Department, ELO Building, 6th Floor</span></div>
+        <div class="info-row"><span>Hours</span><span>Mon–Fri, 8:00 AM–5:00 PM</span></div>
       </section>
 
       <button class="btn btn-danger" id="signout" type="button">Sign Out</button>
@@ -61,19 +112,48 @@
   const user = await UI.require('student'); if (!user) return;
   await UI.mountShell(user, 'profile');
 
-  $('#avatar').innerHTML = UI.icon('user', 40);
-  $('#pname').textContent = user.name;
-  $('#pmeta').textContent = UI.courseLine(user);
+  const saved = $('#saved'), form = $('#editform'), eerr = $('#eerr');
+  let me = user;
+
+  function paint() {
+    $('#avatar').innerHTML = UI.icon('user', 40);
+    $('#pname').textContent = me.name;
+    $('#pmeta').textContent = UI.courseLine(me);
+    const info = [
+      ['Student ID', me.studentId || 'Not set'],
+      ['Course', me.course],
+      ['Year level', me.year],
+      ['Section', me.section || 'Not set'],
+      ['School email', me.email]
+    ];
+    $('#info').innerHTML = info.map(([k, v]) => `<div class="info-row"><span>${k}</span><span>${esc(v)}</span></div>`).join('');
+  }
+  paint();
   $('.setting-row .oicon').innerHTML = UI.icon('lock', 20);
   $('#chev').innerHTML = UI.icon('arrow', 20);
 
-  const info = [
-    ['Student ID', user.studentId || 'Not set'],
-    ['Course', user.course],
-    ['Year level', user.year],
-    ['School email', user.email]
-  ];
-  $('#info').innerHTML = info.map(([k, v]) => `<div class="info-row"><span>${k}</span><span>${esc(v)}</span></div>`).join('');
+  function openEdit(on) {
+    form.hidden = !on; $('#info').hidden = on; $('#editbtn').hidden = on;
+    if (on) {
+      saved.hidden = true; UI.showError(eerr, '');
+      $('#ename').value = me.name || ''; $('#eid').value = me.studentId || ''; $('#esec').value = me.section || '';
+      $('#ecourse').value = me.course; $('#eyear').value = me.year; $('#eemail').value = me.email;
+      $('#ename').focus();
+    }
+  }
+  $('#editbtn').addEventListener('click', () => openEdit(true));
+  $('#ecancel').addEventListener('click', () => openEdit(false));
+  form.addEventListener('submit', async e => {
+    e.preventDefault(); UI.showError(eerr, '');
+    const btn = $('#esave'); btn.disabled = true; btn.textContent = 'Saving…';
+    const r = await DB.updateProfile({ name: $('#ename').value, studentId: $('#eid').value, section: $('#esec').value, course: $('#ecourse').value, year: $('#eyear').value });
+    btn.disabled = false; btn.textContent = 'Save changes';
+    if (!r.ok) return UI.showError(eerr, r.error);
+    me = r.user; paint(); openEdit(false);
+    saved.innerHTML = `${UI.icon('check', 22)}<div><strong>Profile updated.</strong><span>Your new details are now shown to you and to office staff.</span></div>`;
+    saved.hidden = false;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
 
   $('#signout').addEventListener('click', async () => { await DB.logout(); location.href = 'index.html'; });
 })();

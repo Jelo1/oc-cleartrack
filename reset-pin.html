@@ -41,10 +41,6 @@
       <p class="form-error" id="err" role="alert" tabindex="-1" hidden></p>
 
       <form id="form" novalidate hidden>
-        <div class="field" id="emailRow" hidden>
-          <label for="remail">Your school email</label>
-          <input class="input" id="remail" type="email" autocomplete="username" placeholder="name@olivarezcollege.edu.ph">
-        </div>
         <div class="field">
           <label for="pin">New 4-digit PIN</label>
           <div class="pin-wrap">
@@ -81,61 +77,30 @@
   UI.pinToggle();
 
   const err = $('#err'), form = $('#form');
-  const q = new URLSearchParams(location.search);
-  const code = q.get('oobCode');
-  const emailLink = DB.isResetLink(location.href);   // the link from the "Forgot PIN" email
 
-  function validPins() {
-    const pin = $('#pin').value, pin2 = $('#pin2').value;
-    if (!/^\d{4}$/.test(pin)) return UI.showError(err, 'PIN must be exactly 4 digits.'), '';
-    if (pin !== pin2) return UI.showError(err, 'PINs do not match.'), '';
-    return pin;
-  }
-  function again(msg, sub) {
-    form.hidden = true; $('#again').hidden = false;
-    if (sub) $('#subtitle').textContent = sub;
-    UI.showError(err, msg);
-  }
-
-  if (emailLink) {
-    $('#subtitle').textContent = 'Confirm your school email and choose a new 4-digit PIN.';
-    $('#emailRow').hidden = false; form.hidden = false;
-    $('#remail').value = DB.rememberedResetEmail();
-    (($('#remail').value) ? $('#pin') : $('#remail')).focus();
-    form.addEventListener('submit', async e => {
-      e.preventDefault(); UI.showError(err, '');
-      const email = $('#remail').value.trim().toLowerCase();
-      const bad = UI.checkEmail(email); if (bad) return UI.showError(err, bad);
-      const pin = validPins(); if (!pin) return;
-      const btn = $('#form button[type=submit]'); btn.disabled = true; btn.textContent = 'Saving…';
-      const r = await DB.resetWithEmailLink(email, location.href, pin);
-      btn.disabled = false; btn.textContent = 'Reset PIN';
-      if (!r.ok) {
-        if (/invalid or has expired|No ClearTrack account/i.test(r.error)) return again(r.error, 'We could not use this link.');
-        return UI.showError(err, r.error);
-      }
-      UI.flash('PIN updated. Please sign in.');
-      location.href = 'index.html';
-    });
+  const v = await DB.verifyResetLink();
+  if (!v.ok) {
+    $('#subtitle').textContent = 'We could not use this link.';
+    UI.showError(err, v.error);
+    $('#again').hidden = false;
     return;
   }
 
-  if (q.get('mode') !== 'resetPassword' || !code) {
-    $('#subtitle').textContent = 'This page needs the link from your reset email.';
-    UI.showError(err, 'Reset link is missing. Please request a new one.');
-    $('#again').hidden = false; return;
-  }
-
-  /* Firebase's own reset-password link (only used if an action URL is set) */
-  const v = await DB.verifyResetLink(code);
-  if (!v.ok) return again(v.error, 'We could not use this link.');
   $('#subtitle').textContent = `Create a new 4-digit PIN for ${v.email}.`;
-  form.hidden = false; $('#pin').focus();
+  form.hidden = false;
+  $('#pin').focus();
+
   form.addEventListener('submit', async e => {
-    e.preventDefault(); UI.showError(err, '');
-    const pin = validPins(); if (!pin) return;
-    const r = await DB.resetWithLink(code, pin);
-    if (!r.ok) { if (/expired|invalid/i.test(r.error)) return again(r.error); return UI.showError(err, r.error); }
+    e.preventDefault();
+    const pin = $('#pin').value, pin2 = $('#pin2').value;
+    if (!/^\d{4}$/.test(pin)) return UI.showError(err, 'PIN must be exactly 4 digits.');
+    if (pin !== pin2) return UI.showError(err, 'PINs do not match.');
+    const r = await DB.resetWithLink(pin);
+    if (!r.ok) {
+      UI.showError(err, r.error);
+      if (/expired|invalid/i.test(r.error)) { form.hidden = true; $('#again').hidden = false; }
+      return;
+    }
     UI.flash('PIN updated. Please sign in.');
     location.href = 'index.html';
   });

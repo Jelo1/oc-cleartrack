@@ -27,6 +27,44 @@
 
       <div class="banner ok" id="saved" role="status" hidden></div>
 
+      <!-- Student list for this office -->
+      <div class="stats" id="stats" aria-live="polite">
+        <div class="stat"><small>All students</small><b id="nAll">–</b></div>
+        <div class="stat s-ok"><small>Cleared</small><b id="nClr">–</b></div>
+        <div class="stat"><small>Pending</small><b id="nPen">–</b></div>
+        <div class="stat s-warn"><small>With requirement</small><b id="nReq">–</b></div>
+      </div>
+
+      <section class="card tbl-card" id="tblcard">
+        <h2>Students</h2>
+        <p class="sub" style="font-size:14px">Everyone and their <span id="tbloffice"></span> status. Click a student to update them.</p>
+        <div class="tbl-tools">
+          <input class="input grow" id="tq" type="search" placeholder="Search name, email or ID" autocomplete="off" aria-label="Search students">
+          <select class="input" id="tstatus" aria-label="Filter by status">
+            <option value="">All status</option><option value="requirement">With requirement</option><option value="pending">Pending</option><option value="cleared">Cleared</option>
+          </select>
+          <select class="input" id="tcourse" aria-label="Filter by course"><option value="">All courses</option></select>
+          <select class="input" id="tyear" aria-label="Filter by year"><option value="">All years</option></select>
+          <button class="btn btn-outline" id="trefresh" type="button">Refresh</button>
+          <button class="btn btn-outline" id="tcsv" type="button">Export CSV</button>
+          <button class="btn btn-primary" id="tmany" type="button">Update many students</button>
+        </div>
+        <p class="form-error" id="terr" role="alert" hidden></p>
+        <div class="tbl-wrap">
+          <table class="stbl">
+            <thead><tr>
+              <th scope="col"><button type="button" data-sort="name">Student name <span class="ar"></span></button></th>
+              <th scope="col"><button type="button" data-sort="course">Course <span class="ar"></span></button></th>
+              <th scope="col"><button type="button" data-sort="year">Year <span class="ar"></span></button></th>
+              <th scope="col"><button type="button" data-sort="status">Status <span class="ar"></span></button></th>
+              <th scope="col" class="c-req">Requirement</th>
+            </tr></thead>
+            <tbody id="tbody"><tr><td colspan="5" class="dim">Loading students…</td></tr></tbody>
+          </table>
+        </div>
+        <div class="tbl-foot"><span id="tinfo"></span><span class="pager"><button class="btn btn-outline" id="tprev" type="button">Previous</button><span id="tpage"></span><button class="btn btn-outline" id="tnext" type="button">Next</button></span></div>
+      </section>
+
       <!-- Office deadline -->
       <section class="card search-card">
         <h2>Office deadline</h2>
@@ -167,7 +205,7 @@
 
   const office = OFFICES.find(o => o.id === staff.office);
   $('#crumb').textContent = `Staff / ${office.short}`;
-  $('#lead').textContent = `Search for a student and update their ${office.short} clearance status.`;
+  $('#lead').textContent = `See your students below, or search for one, and update their ${office.short} clearance status.`;
   $('#setTitle').textContent = `Set status for ${office.short}`;
   $('#ic-search').innerHTML = UI.icon('search', 18);
   $('#ic-empty').innerHTML = UI.icon('search', 26);
@@ -222,7 +260,91 @@
     saved.hidden = false;
     await paintStudent();
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    loadTable();
   });
+
+
+  /* ---------- student table ---------- */
+  const PAGE = 10, RANK = { requirement: 0, pending: 1, cleared: 2 };
+  let all = [], view = [], page = 0, sortBy = 'name', sortDir = 1;
+  $('#tbloffice').textContent = office.short;
+
+  async function loadTable() {
+    UI.showError($('#terr'), '');
+    $('#trefresh').disabled = true;
+    try { all = await DB.listOfficeStudents(office.id); }
+    catch (e2) { console.error(e2); UI.showError($('#terr'), 'Could not load the student list. Please try Refresh.'); }
+    $('#trefresh').disabled = false;
+    const fill = (sel, vals, first) => { const cur = sel.value; sel.innerHTML = `<option value="">${first}</option>` + vals.map(v => `<option>${esc(v)}</option>`).join(''); sel.value = vals.includes(cur) ? cur : ''; };
+    fill($('#tcourse'), [...new Set(all.map(r => r.course).filter(Boolean))].sort(), 'All courses');
+    fill($('#tyear'), [...new Set(all.map(r => r.year).filter(Boolean))].sort(), 'All years');
+    $('#nAll').textContent = all.length;
+    $('#nClr').textContent = all.filter(r => r.status === 'cleared').length;
+    $('#nPen').textContent = all.filter(r => r.status === 'pending').length;
+    $('#nReq').textContent = all.filter(r => r.status === 'requirement').length;
+    page = 0; paintTable();
+  }
+
+  function applyFilters() {
+    const q = $('#tq').value.trim().toLowerCase(), st = $('#tstatus').value, co = $('#tcourse').value, yr = $('#tyear').value;
+    view = all.filter(r => (!st || r.status === st) && (!co || r.course === co) && (!yr || r.year === yr) &&
+      (!q || (r.name + ' ' + r.email + ' ' + r.studentId).toLowerCase().includes(q)));
+    const key = r => sortBy === 'status' ? RANK[r.status] : String(r[sortBy] || '').toLowerCase();
+    view.sort((a, b) => { const x = key(a), y = key(b); return (x < y ? -1 : x > y ? 1 : a.name.localeCompare(b.name)) * sortDir; });
+  }
+
+  function paintTable() {
+    applyFilters();
+    const pages = Math.max(1, Math.ceil(view.length / PAGE)); page = Math.min(page, pages - 1);
+    const slice = view.slice(page * PAGE, page * PAGE + PAGE);
+    $('#tbody').innerHTML = slice.length ? slice.map(r => `<tr tabindex="0" data-uid="${esc(r.uid)}" aria-label="Update ${esc(r.name)}">
+        <td><div class="nm"><span class="mini">${esc((r.name || '?').charAt(0).toUpperCase())}</span><div><strong>${esc(r.name)}</strong><small>${esc(r.email)}</small></div></div></td>
+        <td>${esc(r.course)}</td><td>${esc(r.year)}</td><td>${UI.badge(r.status)}</td>
+        <td class="c-req dim">${esc(r.requirement) || '–'}</td></tr>`).join('')
+      : `<tr><td colspan="5" class="dim">${all.length ? 'No students match these filters.' : 'No students have signed up yet.'}</td></tr>`;
+    $('#tinfo').textContent = view.length ? `Showing ${page * PAGE + 1}–${page * PAGE + slice.length} of ${view.length} student${view.length === 1 ? '' : 's'}` : '';
+    $('#tpage').textContent = `Page ${page + 1} of ${pages}`;
+    $('#tprev').disabled = page === 0; $('#tnext').disabled = page >= pages - 1;
+    $$('.stbl th [data-sort]').forEach(b => { b.querySelector('.ar').textContent = b.dataset.sort === sortBy ? (sortDir > 0 ? '▲' : '▼') : ''; });
+  }
+
+  ['tq', 'tstatus', 'tcourse', 'tyear'].forEach(id => $('#' + id).addEventListener('input', () => { page = 0; paintTable(); }));
+  $('#tprev').addEventListener('click', () => { page--; paintTable(); });
+  $('#tnext').addEventListener('click', () => { page++; paintTable(); });
+  $('#trefresh').addEventListener('click', loadTable);
+  $$('.stbl th [data-sort]').forEach(b => b.addEventListener('click', () => {
+    sortDir = sortBy === b.dataset.sort ? -sortDir : 1; sortBy = b.dataset.sort; paintTable();
+  }));
+
+  async function pickStudent(uid) {
+    const r = all.find(x => x.uid === uid); if (!r) return;
+    saved.hidden = true; UI.showError(err, '');
+    student = { uid: r.uid, email: r.email, name: r.name, course: r.course, year: r.year, studentId: r.studentId };
+    $('input[name=mode][value=one]').checked = true; $('#one').hidden = false; $('#many').hidden = true;
+    $('#q').value = r.email;
+    await paintStudent(); show(true);
+    $('#result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  $('#tbody').addEventListener('click', e => { const tr = e.target.closest('tr[data-uid]'); if (tr) pickStudent(tr.dataset.uid); });
+  $('#tbody').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { const tr = e.target.closest('tr[data-uid]'); if (tr) { e.preventDefault(); pickStudent(tr.dataset.uid); } } });
+
+  $('#tmany').addEventListener('click', () => {
+    $('input[name=mode][value=many]').checked = true; $('#one').hidden = true; $('#many').hidden = false; saved.hidden = true;
+    $('#many').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  $('#tcsv').addEventListener('click', () => {
+    applyFilters();
+    const cell = v => { v = String(v ?? ''); if (/^[=+\-@\t\r]/.test(v)) v = "'" + v; return '"' + v.replace(/"/g, '""') + '"'; };
+    const lines = [['Student name', 'Email', 'Student ID', 'Course', 'Year', 'Status', 'Requirement', 'Last updated']].concat(
+      view.map(r => [r.name, r.email, r.studentId, r.course, r.year, STATUS[r.status].label, r.requirement, r.updated]));
+    const blob = new Blob(['\ufeff' + lines.map(l => l.map(cell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `${office.id}-students-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+
+  loadTable();
 
   /* ---------- office deadline ---------- */
   const dlerr = $('#dlerr');
@@ -288,6 +410,7 @@
     saved.innerHTML = `${UI.icon('check', 22)}<div><strong>${r.updated} student${r.updated === 1 ? '' : 's'} updated.</strong><span>${r.skipped ? r.skipped + ' already cleared ' + (r.skipped === 1 ? 'was' : 'were') + ' skipped. ' : ''}Each student was notified in the app.</span></div>`;
     saved.hidden = false;
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    loadTable();
   });
 })();
 </script>
